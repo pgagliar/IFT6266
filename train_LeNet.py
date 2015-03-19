@@ -37,38 +37,19 @@ def relu(x):
 
 if __name__=="__main__":
  #config.compute_test_value = 'raise'
- rng=numpy.random.RandomState(23455)
- dataset = DogsVsCats(transformer=RandomCrop(256, 221),
-                         start=0, stop=20000)
-
- it = dataset.iterator(mode='random_slice', batch_size=2500, num_batches=1)
- for X, y in it:
-
-    train_set_x, train_set_y = shared_dataset(X[0:2000,:,:,:], y[0:2000].reshape(2000) )
-    valid_set_x, valid_set_y = shared_dataset(X[2000:2250,:,:,:], y[2000:2250].reshape(250) )
-    test_set_x, test_set_y = shared_dataset(X[2250:2500,:,:,:], y[2250:2500].reshape(250))
-
-
-    nkerns=numpy.array([32,16,16,16])
-
+    rng=numpy.random.RandomState(23455)
 
     # Hyperparameters
     learning_rate = 0.01
-    batch_size = 100
     n_epochs=10
+    nkerns=numpy.array([32,16,16,16])
+    batch_size=10
 
-    # compute number of minibatches for training, validation and testing
-    n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
-    n_valid_batches = valid_set_x.get_value(borrow=True).shape[0] / batch_size
-    n_test_batches = test_set_x.get_value(borrow=True).shape[0] / batch_size
-
-
+    #Symbolic theano variables
     index=T.iscalar('index')
     x = T.tensor4(name='x')  # the data is presented as rasterized images
     y = T.ivector('y')  # the labels are presented as 1D vector of
                         # [int] labels
-
-
 
     ######################
     # BUILD ACTUAL MODEL #
@@ -162,25 +143,17 @@ if __name__=="__main__":
 
     # create a function to compute the mistakes that are made by the model
     test_model = theano.function(
-        [index],
+        [x,y],
         layer6.errors(y),
-        givens={
-            x: test_set_x[index * batch_size: (index + 1) * batch_size],
-            y: test_set_y[index * batch_size: (index + 1) * batch_size]
-        }
     )
 
     validate_model = theano.function(
-        [index],
+        [x,y],
         layer6.errors(y),
-        givens={
-            x: valid_set_x[index * batch_size: (index + 1) * batch_size],
-            y: valid_set_y[index * batch_size: (index + 1) * batch_size]
-        }
     )
 
     # create a list of all model parameters to be fit by gradient descent
-    params = layer3.params + layer2.params + layer1.params + layer0.params
+    params = layer6.params + layer5.params+ layer4.params+ layer3.params + layer2.params + layer1.params + layer0.params
 
     # create a list of gradients for all model parameters
     grads = T.grad(cost, params)
@@ -195,23 +168,44 @@ if __name__=="__main__":
         for param_i, grad_i in zip(params, grads)
     ]
 
+    # train_model = theano.function(
+    #     [index],
+    #     cost,
+    #     updates=updates,
+    #     givens={
+    #         x: train_set_x[index * batch_size: (index + 1) * batch_size],
+    #         y: train_set_y[index * batch_size: (index + 1) * batch_size]
+    #     }
+    # )
     train_model = theano.function(
-        [index],
+        [x,y],
         cost,
-        updates=updates,
-        givens={
-            x: train_set_x[index * batch_size: (index + 1) * batch_size],
-            y: train_set_y[index * batch_size: (index + 1) * batch_size]
-        }
-    )
-
+        updates=updates
+     )
     ###############
     # TRAIN MODEL #
     ###############
     print '... training'
 
+    best_validation_loss = numpy.inf
+    best_iter = 0
+    test_score = 0.
+    start_time = time.clock()
+    minibatch_index=0
+    epoch =0
+    done_looping = False
+
+    train_set = DogsVsCats(transformer=RandomCrop(256, 221),start=0, stop=200)
+    valid_set=DogsVsCats(transformer=RandomCrop(256, 221),start=200, stop=300)
+    test_set=DogsVsCats(transformer=RandomCrop(256, 221),start=300, stop=400)
+
+     # compute number of minibatches for training, validation and testing
+    n_train_batches = train_set.get_num_examples()/batch_size
+    n_valid_batches = valid_set.get_num_examples()/ batch_size
+    n_test_batches = test_set.get_num_examples()/ batch_size
+
     # early-stopping parameters
-    patience = 2000  # look as this many examples regardless
+    patience = 4000  # look as this many examples regardless
     patience_increase = 2  # wait this much longer when a new best is
                            # found
     improvement_threshold = 0.995  # a relative improvement of this much is
@@ -222,23 +216,19 @@ if __name__=="__main__":
                                   # on the validation set; in this case we
                                   # check every epoch
 
-    best_validation_loss = numpy.inf
-    best_iter = 0
-    test_score = 0.
-    start_time = time.clock()
-
-    epoch = 0
-    done_looping = False
-
     train_error=numpy.zeros(n_train_batches)
     train_graph=numpy.zeros(n_epochs)
     validation_graph=numpy.zeros(n_epochs)
 
     while (epoch < n_epochs) and (not done_looping):
         epoch = epoch + 1
-        for minibatch_index in xrange(n_train_batches):
+        it_train = train_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_train_batches)
+        it_valid = valid_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_valid_batches)
+        it_test = test_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_test_batches)
 
-            minibatch_avg_cost = train_model(minibatch_index)
+        for X_train, y_train in it_train:
+            y_train_reshape_cast=y_train.reshape(batch_size).astype('int32')
+            minibatch_avg_cost = train_model(X_train,y_train_reshape_cast )
             train_error[minibatch_index]=minibatch_avg_cost
 
             # iteration number
@@ -246,10 +236,12 @@ if __name__=="__main__":
 
             if (iter + 1) % validation_frequency == 0:
                 # compute zero-one loss on validation set
-                validation_losses = [validate_model(i) for i in xrange(n_valid_batches)]
+                validation_losses = [validate_model(X_valid,y_valid.reshape(batch_size).astype('int32'))
+                                     for X_valid, y_valid in it_valid]
                 this_validation_loss = numpy.mean(validation_losses)
 
                 validation_graph[epoch-1]=this_validation_loss
+                train_graph[epoch-1]=numpy.mean(train_error)
                 train_graph[epoch-1]=numpy.mean(train_error)
 
 
@@ -277,8 +269,8 @@ if __name__=="__main__":
                     best_iter = iter
 
                     # test it on the test set
-                    test_losses = [test_model(i) for i
-                                   in xrange(n_test_batches)]
+                    test_losses = [test_model(X_test,y_test.reshape(batch_size).astype('int32'))
+                                   for X_test, y_test in it_test]
                     test_score = numpy.mean(test_losses)
 
                     print(('     epoch %i, minibatch %i/%i, test error of '
@@ -289,7 +281,7 @@ if __name__=="__main__":
             if patience <= iter:
                 done_looping = True
                 break
-
+            minibatch_index=minibatch_index+1
 
     end_time = time.clock()
     print(('Optimization complete. Best validation score of %f %% '
@@ -305,4 +297,5 @@ if __name__=="__main__":
     plt.xlabel('Number of epochs')
     legend = plt.legend(loc='upper center')
     plt.grid(True)
-    plt.show()
+    fig = plt.gcf()
+    fig.savefig('/Users/pierregagliardi/DossierTravail/Programmation/PythonPath/ProjetCatsVsDogs/Figures/train_validation_error.png')
