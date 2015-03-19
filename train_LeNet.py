@@ -191,7 +191,7 @@ if __name__=="__main__":
     best_iter = 0
     test_score = 0.
     start_time = time.clock()
-    minibatch_index=0
+
     epoch =0
     done_looping = False
 
@@ -225,6 +225,7 @@ if __name__=="__main__":
         it_train = train_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_train_batches)
         it_valid = valid_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_valid_batches)
         it_test = test_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_test_batches)
+        minibatch_index=0
 
         for X_train, y_train in it_train:
             y_train_reshape_cast=y_train.reshape(batch_size).astype('int32')
