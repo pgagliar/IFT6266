@@ -4,6 +4,7 @@ import sys
 import theano
 import numpy
 import matplotlib.pyplot as plt
+from updates import momentum_bis
 from theano import tensor as T
 from LeNet_conv_poollayer import LeNetConvPoolLayer
 from hidden_layer import HiddenLayer
@@ -44,6 +45,7 @@ if __name__=="__main__":
     n_epochs=10
     nkerns=numpy.array([32,16,16,16])
     batch_size=10
+    momentum=0.9
 
     #Symbolic theano variables
     index=T.iscalar('index')
@@ -117,7 +119,7 @@ if __name__=="__main__":
     # or (100, 16 * 18* 18) = (100, 5184) with the default values.
     layer4_input = layer3.output.flatten(2)
 
-    # construct a fully-connected sigmoidal layer
+    # construct a fully-connected relu layer
     layer4 = HiddenLayer(
         rng,
         input=layer4_input,
@@ -126,7 +128,7 @@ if __name__=="__main__":
         activation=relu
     )
 
-    # construct a fully-connected sigmoidal layer
+    # construct a fully-connected relu layer
     layer5 = HiddenLayer(
         rng,
         input=layer4.output,
@@ -156,41 +158,34 @@ if __name__=="__main__":
     params = layer6.params + layer5.params+ layer4.params+ layer3.params + layer2.params + layer1.params + layer0.params
 
     # create a list of gradients for all model parameters
-    grads = T.grad(cost, params)
+    # grads = T.grad(cost, params)
 
     # train_model is a function that updates the model parameters by
     # SGD Since this model has many parameters, it would be tedious to
     # manually create an update rule for each model parameter. We thus
     # create the updates list by automatically looping over all
     # (params[i], grads[i]) pairs.
-    updates = [
-        (param_i, param_i - learning_rate * grad_i)
-        for param_i, grad_i in zip(params, grads)
-    ]
 
-    # train_model = theano.function(
-    #     [index],
-    #     cost,
-    #     updates=updates,
-    #     givens={
-    #         x: train_set_x[index * batch_size: (index + 1) * batch_size],
-    #         y: train_set_y[index * batch_size: (index + 1) * batch_size]
-    #     }
-    # )
+    # updates = [
+    #     (param_i, param_i - learning_rate * grad_i)
+    #     for param_i, grad_i in zip(params, grads)
+    # ]
+    updates = momentum_bis(cost, params, learning_rate, momentum)
+
     train_model = theano.function(
         [x,y],
-        cost,
-        updates=updates
+        cost, #Le calcul de l'erreur est la partie forward propagation
+        updates=updates #L'update est la partie backward propagation
      )
     ###############
     # TRAIN MODEL #
     ###############
     print '... training'
-
+    start_time = time.clock()
     best_validation_loss = numpy.inf
     best_iter = 0
     test_score = 0.
-    start_time = time.clock()
+    start_time_total = time.clock()
 
     epoch =0
     done_looping = False
@@ -221,6 +216,7 @@ if __name__=="__main__":
     validation_graph=numpy.zeros(n_epochs)
 
     while (epoch < n_epochs) and (not done_looping):
+        start_time_epoch = time.clock()
         epoch = epoch + 1
         it_train = train_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_train_batches)
         it_valid = valid_set.iterator(mode='random_slice', batch_size=batch_size, num_batches= n_valid_batches)
@@ -243,8 +239,7 @@ if __name__=="__main__":
 
                 validation_graph[epoch-1]=this_validation_loss
                 train_graph[epoch-1]=numpy.mean(train_error)
-                train_graph[epoch-1]=numpy.mean(train_error)
-
+                end_time_epoch = time.clock()
 
                 print(
                     'epoch %i, minibatch %i/%i, validation error %f %%' %
@@ -256,6 +251,12 @@ if __name__=="__main__":
 
                     )
                 )
+                print >> sys.stderr,('The epoch %i ran for %.2fm' %
+                                       (
+                                            epoch,
+                                            (end_time_epoch- start_time_epoch) / 60.
+                                        )
+                                    )
 
                 # if we got the best validation score until now
                 if this_validation_loss < best_validation_loss:
@@ -269,15 +270,11 @@ if __name__=="__main__":
                     best_validation_loss = this_validation_loss
                     best_iter = iter
 
-                    # test it on the test set
-                    test_losses = [test_model(X_test,y_test.reshape(batch_size).astype('int32'))
-                                   for X_test, y_test in it_test]
-                    test_score = numpy.mean(test_losses)
 
-                    print(('     epoch %i, minibatch %i/%i, test error of '
+                    print(('     epoch %i, minibatch %i/%i, train error of '
                            'best model %f %%') %
                           (epoch, minibatch_index + 1, n_train_batches,
-                           test_score * 100.))
+                           train_graph[epoch-1] * 100.))
 
             if patience <= iter:
                 done_looping = True
