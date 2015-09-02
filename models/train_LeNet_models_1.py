@@ -6,12 +6,12 @@ import numpy
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from updates import momentum_bis
-from rmsprop import rmsprop
+from Optimization_error_function.momentum import momentum_bis
+from Optimization_error_function.rmsprop import rmsprop
 from theano import tensor as T
-from LeNet_conv_poollayer import LeNetConvPoolLayer
-from hidden_layer import HiddenLayer
-from logistic_regression_class import LogisticRegression
+from Layers.LeNet_conv_poollayer import LeNetConvPoolLayer
+from Layers.hidden_layer import HiddenLayer
+from Layers.logistic_regression_class import LogisticRegression
 from ift6266h15.code.pylearn2.datasets.variable_image_dataset import DogsVsCats, RandomCrop
 
 
