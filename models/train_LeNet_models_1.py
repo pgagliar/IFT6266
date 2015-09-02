@@ -3,22 +3,22 @@ import os
 import sys
 import theano
 import numpy
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from Optimization_error_function.rmsprop import rmsprop
+from Optimization_error_function.momentum import momentum
 from theano import tensor as T
 from Layers.LeNet_conv_poollayer import LeNetConvPoolLayer
 from Layers.hidden_layer import HiddenLayer
 from Layers.logistic_regression_class import LogisticRegression
-from ift6266h15.code.pylearn2.datasets.variable_image_dataset import DogsVsCats, RandomCrop
+from Datasets.variable_image_dataset import DogsVsCats, RandomCrop
+from Figures.plot import plot_training_validation_error
 
 
+#Rectified linear unit function for activation function
 def relu(x):
     return theano.tensor.switch(x<0, 0, x)
 
 if __name__=="__main__":
- #config.compute_test_value = 'raise'
+
     rng=numpy.random.RandomState(23455)
 
     # Hyperparameters
@@ -35,7 +35,7 @@ if __name__=="__main__":
                         # [int] labels
 
     ######################
-    # BUILD ACTUAL MODEL #
+    # BUILD MODEL #
     ######################
     print '... building the model'
 
@@ -164,12 +164,12 @@ if __name__=="__main__":
     #     (param_i, param_i - learning_rate * grad_i)
     #     for param_i, grad_i in zip(params, grads)
     # ]
-    updates = momentum_bis(cost, params, learning_rate)
+    updates = momentum(cost, params, learning_rate)
 
     train_model = theano.function(
         [x,y],
-        cost, #Le calcul de l'erreur est la partie forward propagation
-        updates=updates #L'update est la partie backward propagation
+        cost, #Compute the error function: forward propagation
+        updates=updates #All the parameters are updated according to the direction of the steepest descent
      )
     ###############
     # TRAIN MODEL #
@@ -184,26 +184,32 @@ if __name__=="__main__":
     epoch =0
     done_looping = False
 
+    # We split the dataset between training set, validation set and testing set
+    # We randomly crop a 100x100 window before training,
+    # this technique is called data augmentation and improves generalization
     train_set = DogsVsCats(transformer=RandomCrop(256, 100),start=0, stop=20000)
     valid_set=DogsVsCats(transformer=RandomCrop(256, 100),start=20000, stop=22500)
     test_set=DogsVsCats(transformer=RandomCrop(256, 100),start=22500, stop=25000)
 
-     # compute number of minibatches for training, validation and testing
+     # Compute number of minibatches for training, validation and testing
     n_train_batches = train_set.get_num_examples()/batch_size
     n_valid_batches = valid_set.get_num_examples()/ batch_size
     n_test_batches = test_set.get_num_examples()/ batch_size
 
-    # early-stopping parameters
-    patience = 100000  # look as this many examples regardless
-    patience_increase = 2  # wait this much longer when a new best is
-                           # found
-    improvement_threshold = 0.995  # a relative improvement of this much is
-                                   # considered significant
+    # Early-stopping parameters#
+    ############################
+    # Look as this many examples regardless
+    patience = 100000
+    # wait this much longer when a new best is found
+    patience_increase = 2
+    # A relative improvement of this much is considered significant
+    improvement_threshold = 0.995
+    # Go through this many
+    # minibatches before checking the network
+    # on the validation set; in this case we
+    # check every epoch
     validation_frequency = min(n_train_batches, patience / 2)
-                                  # go through this many
-                                  # minibatche before checking the network
-                                  # on the validation set; in this case we
-                                  # check every epoch
+
 
     train_error=numpy.zeros(n_train_batches)
     train_graph=numpy.zeros(n_epochs)
@@ -278,18 +284,12 @@ if __name__=="__main__":
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
-    print >> sys.stderr, ('The code for file ' +
-                          os.path.split(__file__)[1] +
-                          ' ran for %.2fm' % ((end_time - start_time) / 60.))
-    path='/u/gagliarp/git/ProjetCatsVsDogs/Figures/'
+    print >> sys.stderr, ('The code for file ' +os.path.split(__file__)[1] +' ran for %.2fm' % ((end_time - start_time) / 60.))
+
+    #Save training errors and validations errors in npy file
+    path='/Users/pierregagliardi/DossierTravail/Programmation/PythonPath/ProjetCatsVsDogs/Figures/'
     numpy.save(path+'training_data',train_graph)
     numpy.save(path+'validation_data',validation_graph)
 
-    plt.plot(range(n_epochs),train_graph,color='r',label='training',marker='o')
-    plt.plot(range(n_epochs),validation_graph,color='b',label='validation', marker='o')
-    plt.ylabel('Error rates')
-    plt.xlabel('Number of epochs')
-    legend = plt.legend(loc='upper center')
-    plt.grid(True)
-    fig = plt.gcf()
-    fig.savefig(path+'train_validation_error.png')
+    #Plot training and validation error
+    plot_training_validation_error(path)
