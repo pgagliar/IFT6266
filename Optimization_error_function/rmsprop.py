@@ -4,7 +4,7 @@ from theano import tensor as T
 import numpy as np
 from itertools import izip
 
-def rmsprop(cost,params,learning_rate,rho=0.9, eps=1e-6,momentum=0.9):
+def rmsprop_function(cost,params,learning_rate,rho=0.9, eps=1e-6,momentum=0.9):
 	# create variables to store intermediate updates
     accumulation_r = [theano.shared(np.zeros(p.get_value().shape,
                                           dtype=theano.config.floatX),

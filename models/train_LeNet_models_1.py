@@ -3,8 +3,8 @@ import os
 import sys
 import theano
 import numpy
-from Optimization_error_function.rmsprop import rmsprop
-from Optimization_error_function.momentum import momentum
+from Optimization_error_function.rmsprop import rmsprop_function
+from Optimization_error_function.momentum import momentum_function
 from theano import tensor as T
 from Layers.LeNet_conv_poollayer import LeNetConvPoolLayer
 from Layers.hidden_layer import HiddenLayer
@@ -164,7 +164,7 @@ if __name__=="__main__":
     #     (param_i, param_i - learning_rate * grad_i)
     #     for param_i, grad_i in zip(params, grads)
     # ]
-    updates = momentum(cost, params, learning_rate)
+    updates = momentum_function(cost, params, learning_rate)
 
     train_model = theano.function(
         [x,y],
