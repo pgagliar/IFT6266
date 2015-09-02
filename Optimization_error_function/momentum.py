@@ -2,6 +2,7 @@ import numpy as np
 import theano
 #For a more efficient optimization of the error function, we use momentum
 def momentum_function(cost, params, learning_rate, momentum=0.9):
+    # Create a list of gradients for all model parameters
     all_grads = theano.grad(cost, params)
     updates = []
     extra_params = []
