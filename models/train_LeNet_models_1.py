@@ -24,6 +24,7 @@ if __name__=="__main__":
     # Hyperparameters
     learning_rate = 0.01
     n_epochs=200
+    #number of feature maps, begins at layer 1
     nkerns=numpy.array([8,16,16,16,32])
     batch_size=50
     momentum=0.9
@@ -39,15 +40,15 @@ if __name__=="__main__":
     ######################
     print '... building the model'
 
-    # Reshape matrix of rasterized images of shape (batch_size, 221 * 221)
+    # Reshape matrix of rasterized images of shape (batch_size, image_size_0*image_size_0)
     # to a 4D tensor, compatible with our LeNetConvPoolLayer
-    # (221, 221) is the size of MNIST images.
+    #The tuple represents (batchsize, channels, rows, columns)
     layer0_input = x.reshape((batch_size, 3, 100, 100))
 
-    # Construct the first convolutional pooling layer:
-    # filtering reduces the image size to (221+5-1 , 221+5-1) = (224, 224)
-    # maxpooling reduces this further to (112, 112)
-    # 4D output tensor is thus of shape (batch_size, nkerns[0], 112, 112)
+    # For each convolutional pooling layer:
+    # First, filtering reduces the image size to image_size_n + 5 - 1
+    # Second, maxpooling reduces this further to (image_size_n + 4)/2 =image_size_n+1
+    # layer_n.output is thus of shape (batch_size, nkerns[n], image_size_n+1, image_size_n+1)
     layer0 = LeNetConvPoolLayer(
         rng,
         input=layer0_input,
@@ -56,10 +57,7 @@ if __name__=="__main__":
         poolsize=(2, 2)
     )
 
-    # Construct the second convolutional pooling layer
-    # filtering reduces the image size to (112+5-1, 112+5-1) = (116, 116)
-    # maxpooling reduces this further to (116/2, 116/2) = (58, 58)
-    # 4D output tensor is thus of shape (batch_size, nkerns[1], 58, 58)
+
     layer1 = LeNetConvPoolLayer(
         rng,
         input=layer0.output,
@@ -68,10 +66,6 @@ if __name__=="__main__":
         poolsize=(2, 2)
     )
 
-    # Construct the second convolutional pooling layer
-    # filtering reduces the image size to (58+5-1, 58+5-1) = (62, 62)
-    # maxpooling reduces this further to (62/2, 62/2) = (31, 31)
-    # 4D output tensor is thus of shape (batch_size, nkerns[1], 31, 31)
 
     layer2 = LeNetConvPoolLayer(
         rng,
@@ -81,11 +75,6 @@ if __name__=="__main__":
         poolsize=(2, 2)
     )
 
-     # Construct the second convolutional pooling layer
-    # filtering reduces the image size to (31+5-1, 31+5-1) = (35, 35)
-    # maxpooling reduces this further to (34/2, 34/2) = (17, 17)
-    # 4D output tensor is thus of shape (batch_size, nkerns[2], 17, 17)
-
     layer3 = LeNetConvPoolLayer(
         rng,
         input=layer2.output,
@@ -93,11 +82,7 @@ if __name__=="__main__":
         filter_shape=(nkerns[3], nkerns[2], 4, 4),
         poolsize=(2, 2)
     )
-    
-    # Construct the second convolutional pooling layer
-    # filtering reduces the image size to (16+5-1, 16+5-1) = (20, 20)
-    # maxpooling reduces this further to (20/2, 20/2) = (10, 10)
-    # 4D output tensor is thus of shape (batch_size, nkerns[2], 10, 10)
+
 
     layer4 = LeNetConvPoolLayer(
         rng,
@@ -107,10 +92,10 @@ if __name__=="__main__":
         poolsize=(2, 2)
     )
 
-    # the HiddenLayer being fully-connected, it operates on 2D matrices of
+    # The HiddenLayer being fully-connected, it operates on 2D matrices of
     # shape (batch_size, num_pixels) (i.e matrix of rasterized images).
-    # This will generate a matrix of shape (batch_size, nkerns[3] * 18 * 18),
-    # or (100, 16 * 18* 18) = (100, 5184) with the default values.
+    # This will generate a matrix of shape:
+    # (batch_size, nkerns[last_CNN_layer] * image_size_last_CNN_layer * image_size_last_CNN_layer)
     layer5_input = layer4.output.flatten(2)
 
     # construct a fully-connected relu layer
@@ -122,7 +107,7 @@ if __name__=="__main__":
         activation=relu
     )
 
-    # construct a fully-connected relu layer
+    # Construct a fully-connected relu layer
     layer6 = HiddenLayer(
         rng,
         input=layer5.output,
@@ -131,13 +116,13 @@ if __name__=="__main__":
         activation=relu
     )
 
-    # classify the values of the fully-connected sigmoidal layer
+    # Classify the values of the fully-connected sigmoidal layer
     layer7 = LogisticRegression(input=layer6.output, n_in=256, n_out=2)
 
-    # the cost we minimize during training is the NLL of the model
+    # The cost we minimize during training is the NLL of the model
     cost = layer7.negative_log_likelihood(y)
 
-    # create a function to compute the mistakes that are made by the model
+    # Create a function to compute the mistakes that are made by the model
     test_model = theano.function(
         [x,y],
         layer7.errors(y),
@@ -148,22 +133,10 @@ if __name__=="__main__":
         layer7.errors(y),
     )
 
-    # create a list of all model parameters to be fit by gradient descent
+    # Create a list of all model parameters to be fit by gradient descent
     params = layer7.params+layer6.params + layer5.params+ layer4.params+ layer3.params + layer2.params + layer1.params + layer0.params
 
-    # create a list of gradients for all model parameters
-    # grads = T.grad(cost, params)
 
-    # train_model is a function that updates the model parameters by
-    # SGD Since this model has many parameters, it would be tedious to
-    # manually create an update rule for each model parameter. We thus
-    # create the updates list by automatically looping over all
-    # (params[i], grads[i]) pairs.
-
-    # updates = [
-    #     (param_i, param_i - learning_rate * grad_i)
-    #     for param_i, grad_i in zip(params, grads)
-    # ]
     updates = momentum_function(cost, params, learning_rate)
 
     train_model = theano.function(

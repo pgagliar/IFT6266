@@ -40,9 +40,9 @@ if __name__=="__main__":
     ######################
     print '... building the model'
 
-    # Reshape matrix of rasterized images of shape (batch_size, 221 * 221)
+    # Reshape matrix of rasterized images of shape (batch_size, image_size * image_size)
     # to a 4D tensor, compatible with our LeNetConvPoolLayer
-    # (221, 221) is the size of MNIST images.
+    #The tuple represents (batchsize, channels, rows, columns)
     layer0_input = x.reshape((batch_size, 3, 100, 100))
 
     # Construct the first convolutional pooling layer:
