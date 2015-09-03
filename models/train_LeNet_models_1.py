@@ -40,14 +40,15 @@ if __name__=="__main__":
     ######################
     print '... building the model'
 
-    # Reshape matrix of rasterized images of shape (batch_size, image_size_0*image_size_0)
+    # Reshape matrix of rasterized images of shape (batch_size, input channels, image_size_0*image_size_0)
     # to a 4D tensor, compatible with our LeNetConvPoolLayer
     #The tuple represents (batchsize, channels, rows, columns)
     layer0_input = x.reshape((batch_size, 3, 100, 100))
 
     # For each convolutional pooling layer:
-    # First, filtering reduces the image size to image_size_n + 5 - 1
-    # Second, maxpooling reduces this further to (image_size_n + 4)/2 =image_size_n+1
+    # First, the convolution of the image with a filter is computed.
+    # Second, relu function is applied on the results of convolution to obtain hidden units
+    # Third, maxpooling is applied on the hidden units in the same neighborhood
     # layer_n.output is thus of shape (batch_size, nkerns[n], image_size_n+1, image_size_n+1)
     layer0 = LeNetConvPoolLayer(
         rng,
@@ -116,7 +117,7 @@ if __name__=="__main__":
         activation=relu
     )
 
-    # Classify the values of the fully-connected sigmoidal layer
+    # Classify the values of the fully-connected softmax layer
     layer7 = LogisticRegression(input=layer6.output, n_in=256, n_out=2)
 
     # The cost we minimize during training is the NLL of the model

@@ -1,4 +1,3 @@
-__author__ = 'pierregagliardi'
 import theano
 from theano import tensor as T
 import numpy
